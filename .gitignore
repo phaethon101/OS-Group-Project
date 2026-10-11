@@ -1,0 +1,11 @@
+# 构建产物
+code/obj/
+code/bin/
+
+# 备份 / 临时文件
+*.bak
+*.o
+
+# 调试临时文件（make grade / make debug 产生）
+.gdb.in
+.qemu.out
