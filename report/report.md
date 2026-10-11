@@ -62,13 +62,55 @@
 
 ### 练习一：理解内核启动中的程序入口操作
 
-**负责人：** 2412243-曹珂瑜
+**负责人：** 2412243-曹珂瑜、2410621-辛梓晗
 
-借助 AI，成功了解到了 `la sp, bootstacktop` 和 `tail kern_init` 这两段代码在启动过程中的作用以及目的。
+借助 AI，成功了解到了 `la sp, bootstacktop` 和 `tail kern_init` 这两段代码在启动过程中的作用以及目的。`entry.S` 全文核心只有两条指令（外加数据段的栈空间声明）：
 
-在 `la sp, bootstacktop` 这段代码中，`la` 为 `load address` 伪指令，用于将符号地址加载到寄存器中；`sp` 是栈指针寄存器；`bootstacktop` 表示内核启动栈的顶端地址。最终，这段代码的作用是将 `bootstacktop` 的地址加载到 `sp` 寄存器里，其目的是为了在内核启动时为内核代码分配并建立栈空间。
+```asm
+kern_entry:
+    la sp, bootstacktop   # 1. 设置内核栈顶
+    tail kern_init        # 2. 尾调用 C 入口
+# 数据段
+bootstack: .space KSTACKSIZE
+bootstacktop:
+```
 
-而在 `tail kern_init` 这段代码中，`tail` 是一个伪指令，用于生成尾调用，将 PC 设置为 `kern_init` 函数的地址，并跳转过去但不保留返回地址；`kern_init` 是内核的 C 主入口函数，用于进一步初始化内核。这段代码的作用是实现内核从汇编入口 `kern_entry` 向 C 主入口 `kern_init` 进行一次单向的移交，其目的是在栈已建好的前提下，正式开启内核的 C 语言初始化流程，即清零 BSS、打印启动信息，并接入后续实验的初始化代码。
+链接脚本 `tools/kernel.ld` 通过 `ENTRY(kern_entry)` 和 `BASE_ADDRESS = 0x80200000` 把内核定位到 `0x80200000`，并把 `.text.kern_entry` 排在最前。因此 QEMU/OpenSBI 交出控制权时 PC 落在 `kern_entry`，此刻内核没有任何运行环境（无页表、无 C 运行时，`sp` 是引导程序留下的不确定值）。
+
+**（1）`la sp, bootstacktop`**
+
+`la` = *load address* 伪指令（**不是硬件指令**），汇编器展开为 `auipc sp, %pcrel_hi(bootstacktop)` + `addi sp, sp, %pcrel_lo(...)`，采用 PC 相对寻址，把符号 `bootstacktop` 的地址装入栈指针 `sp`。`bootstacktop` 是内核启动栈的**栈顶**：`.data` 段中 `.align PGSHIFT`（4KB 对齐）后用 `.space KSTACKSIZE` 预留栈空间，紧随其后的 `bootstacktop` 即这块空间的最高地址，而 `KSTACKSIZE = KSTACKPAGE * PGSIZE = 2 * 4096 = 8192` 字节（见 `memlayout.h`、`mmu.h`）。
+
+之所以指向 `bootstacktop`（高地址）而非 `bootstack`（低地址）：RISC-V 栈**向下增长**，`sp` 必须指向栈顶最高地址，第一次压栈时 `sp` 才向低地址进入这块合法内存；若指向 `bootstack`，一压栈就越界、破坏其前面的数据。
+
+**作用**：把 `sp` 指向 8KB 内核启动栈的栈顶。**目的**：为即将执行的 C 代码建立合法的栈环境——C 函数的局部变量、返回地址、保存寄存器都依赖 `sp`，不先建栈，进入 C 函数就会崩溃。
+
+**（2）`tail kern_init`**
+
+`tail` 是 RISC-V 的**尾调用伪指令**（不是硬件指令），展开为 `auipc t1, %pcrel_hi(kern_init)` + `jalr x0, t1, %pcrel_lo(...)`。关键在于 `jalr` 的目标寄存器是 **`x0`（零寄存器）**：普通调用 `call`（= `jal ra,...`）把返回地址写入 `ra`（x1）以便函数返回；而 `tail` 把链接结果写入 `x0`，`x0` 恒为 0、写入即丢弃——即**不保存返回地址**，纯粹是"跳到某处且永不回来"的无条件跳转。
+
+**作用**：把控制权从汇编入口 `kern_entry` **单向移交**给 C 入口 `kern_init`，且不建立调用帧、不污染 `ra`。**目的**：因为 `kern_init` 被声明为 `noreturn`（以 `while(1);` 收尾、永不返回），保存返回地址没有意义；用 `tail` 语义更准确（"交棒"而非"调用"），也与 `noreturn` 完全吻合。它与 `la sp, bootstacktop` 的配合是：**先建好栈，再交棒 C 代码**。
+
+**（3）实测印证（GDB）**
+
+QEMU + GDB 调试时，内核入口 `0x80200000` 处的反汇编进一步印证了上述结论：
+
+```
+0x80200000 <kern_entry>:     auipc sp,0x3      # 即 la sp, bootstacktop → sp = 0x80203000
+0x80200004 <kern_entry+4>:   mv    sp,sp
+0x80200008 <kern_entry+8>:   j     0x8020000a <kern_init>   # 即 tail kern_init（未写 ra）
+```
+
+`si` 单步后 `sp = 0x80203000`，正与 `bootstacktop` 的符号地址一致；`tail kern_init` 编译为一条**不写 `ra`** 的 `j`。
+
+**完整启动流程串联**：
+
+```
+QEMU/OpenSBI（固件）──把 PC 设为 0x80200000，交出控制权──▶
+kern_entry（entry.S）── la sp, bootstacktop 建立 8KB 内核栈 ──▶
+                      ── tail kern_init      交棒 C，不保存返回地址 ──▶
+kern_init（init.c）   ── memset 清零 BSS ── cprintf 打印 ── while(1)
+```
 
 **所用提示词：**
 
@@ -101,7 +143,7 @@
 
 ### 练习二：使用 GDB 验证启动流程
 
-**负责人：** 2411204-孙唯源
+**负责人：** 2411204-孙唯源、2410621-辛梓晗
 
 **练习目标**：通过 GDB 跟踪 QEMU 模拟的 RISC-V 启动过程，观察复位地址附近的固件指令，并跟踪执行流程到内核入口 `0x80200000`。重点理解启动固件、OpenSBI 与实验内核之间的控制流交接。
 

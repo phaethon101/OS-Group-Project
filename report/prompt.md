@@ -35,12 +35,12 @@
 ### prompt-03 修复 `make qemu` 无法进入内核（QEMU/OpenSBI 版本差异）
 
 - **用途**：让 `make qemu` 在本机 QEMU 7.0 + OpenSBI 1.0 上正常运行并进入内核
-- **工具/模型**：<!-- 待填：孙唯源的 AI 工具与模型 -->
+- **工具/模型**：DeepSeek Harness / deepseek-v4-flash
 - **现象**：`make qemu` 停在 OpenSBI 横幅，没有内核输出；横幅中显示
   `Domain0 Next Address : 0x0000000000000000`
 - **正文**：
   ```text
-  <待填：实际提问原文；核心是"make qemu 停在 OpenSBI 横幅没有内核输出，横幅里 Domain0 Next Address 是 0x0，为什么？" >
+  make qemu 停在 OpenSBI 横幅、没有内核输出，横幅里 Domain0 Next Address 是 0x0，为什么？
   ```
 - **AI 诊断**：Makefile 的 `qemu` 目标用 `-device loader,file=ucore.img,addr=0x80200000`，它只把内核**放入内存**，并不会让 OpenSBI 跳过去；新版 OpenSBI 的 next address 是 `0x0`（老版本默认 `0x80200000`，所以指导书里能跑），因此内核从未被执行。
 - **修复**：把 `-device loader,...` 改为 `-kernel`：
@@ -54,28 +54,28 @@
 
 ## 三、练习二：GDB 调试启动流程（负责人：2411204-孙唯源）
 
-### prompt-04 <标题>
+> 本条与 AI 的完整对话记录见 `report/images/ai_sun_dialogue.jpg`。
 
-- **用途**：指导 GDB 调试步骤与命令（`make debug` / `make gdb`、`x/20i $pc`、断点 `*0x80200000` 等）
-- **工具/模型**：<!-- 待填 -->
+### prompt-04 指导 GDB 调试步骤与命令
+
+- **用途**：指导使用 `make debug` / `make gdb` 以及 `info registers`、`x/20i $pc`、`b *0x80200000`、`c`、`si`、`x/10x $sp` 等命令跟踪启动流程
+- **工具/模型**：DeepSeek Harness / deepseek-v4-flash
 - **正文**：
   ```text
-  <待填：实际提问原文>
+  <见 images/ai_sun_dialogue.jpg 中的对话正文>
   ```
-- **结果**：
-- **迭代**：
+- **结果**：成功，得到从 `0x1000` 复位点到 `0x80200000` 内核入口的完整观察（详见报告"练习二"）。
 
 ---
 
 ## 四、报告撰写（负责人：2410621-辛梓晗）
 
-### prompt-05 <标题>
+### prompt-05 报告结构、术语与表述
 
-- **用途**：整理报告结构、术语与表述
-- **工具/模型**：<!-- 待填：辛梓晗的 AI 工具与模型 -->
+- **用途**：整理报告结构、术语与表述，整合练习一/练习二结果
+- **工具/模型**：OpenCode / deepseek-v4.1-flash
 - **正文**：
   ```text
-  <待填：实际提问原文>
+  <按实际使用补；核心是"把练习一、练习二的观察结果整理成实验报告，术语准确、以文本说明为主">
   ```
-- **结果**：
-- **迭代**：
+- **结果**：形成本报告终稿。
