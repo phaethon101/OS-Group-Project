@@ -58,7 +58,20 @@
 
 ## 三、检验复现与统筹（负责人：2410621-辛梓晗）
 
-### prompt-04 复现并核验练习二 GDB 调试
+> 本部分使用 AI 的会话统计证据见 `report/images/xin_ai_usage.png`（提供商 OpenCode Go / 模型 DeepSeek V4.1 Flash；会话"操作系统 lab1 实验要求与计划"；261 条消息；2026-10-08 ~ 10-11）。
+
+### prompt-04 排查 `make qemu` 无法进入内核
+
+- **用途**：让 `make qemu` 正常进入内核
+- **工具/模型**：OpenCode / deepseek-v4.1-flash
+- **正文**：
+  ```text
+  在 WSL 里 make qemu 停在 OpenSBI 横幅、没有内核输出，帮我定位原因并修复
+  ```
+- **结果**：成功。定位到本机 QEMU 7.0 + OpenSBI 1.0 下，Makefile 的 `-device loader,file=...,addr=0x80200000` 只把内核放入内存、OpenSBI 的 `next address` 为 `0x0` 并不跳转；改为 `-kernel bin/ucore.img` 后出现 `(THU.CST) os is loading ...`。
+- **迭代**：`-device loader`（失败）→ 定位 QEMU/OpenSBI 版本行为差异 → `-kernel`（成功）。
+
+### prompt-05 复现并核验练习二 GDB 调试
 
 - **用途**：复现并核验练习二（GDB 从 `0x1000` 到 `0x80200000` 的启动流程追踪），确认输出
 - **工具/模型**：OpenCode / deepseek-v4.1-flash
@@ -68,3 +81,25 @@
   ```
 - **结果**：成功。在 WSL 中按 `make debug` + `make gdb` 复现，确认 GDB 停在复位点 `0x1000`、断点命中 `0x80200000`，得到复位指令、内核入口反汇编与寄存器输出（见 `report/images/gdb_at_1000.png`、`gdb_at_80200000.png`、`gdb_registers.png`）。
 - **迭代**：初次为手动逐条执行 GDB 命令；之后**添加合适的自动化复现脚本**——`code/gdb_trace.gdb`（批处理采集复位点/入口的反汇编与寄存器）+ `code/run_gdb.sh`（一键编排：起暂停的 QEMU → 跑批处理 GDB → 收集输出 → 清理），使整段调试可重复复现。
+
+### prompt-06 报告整合与格式（套模板）
+
+- **用途**：把练习一/练习二的观察结果整合为实验报告终稿
+- **工具/模型**：OpenCode / deepseek-v4.1-flash
+- **正文**：
+  ```text
+  把练习一、练习二的观察结果整合成实验报告终稿，套用实验报告模板，术语准确、以文本说明为主
+  ```
+- **结果**：成功。形成 `report/report.md` 终稿（含实验基本信息/分工、实验目的、实验环境、整体逻辑分析、练习一/练习二、测试与验证、总结）。
+- **迭代**：先由各成员分别提供练习一/练习二的答案与截图，再统一整合、补全缺失章节并校正术语。
+
+### prompt-07 搭建 git 结构并提交
+
+- **用途**：按课程规范搭建仓库结构并提交
+- **工具/模型**：OpenCode / deepseek-v4.1-flash
+- **正文**：
+  ```text
+  按"一次实验一个分支（命名为 labx）+ 分支内 code/ 与 report/ 两个文件夹"的规范，搭建仓库结构并提交推送到 GitHub
+  ```
+- **结果**：成功。分支 `lab1`，内含 `code/`（源码）与 `report/`（`report.md`、`prompt.md`、`images/`），已推送到远端。
+- **迭代**：HTTPS 直连/HTTP 代理推送 GitHub 失败（网络/代理），改用 **SOCKS5 代理**（`socks5h://127.0.0.1:7890`）后推送成功。
