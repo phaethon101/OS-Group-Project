@@ -30,52 +30,41 @@
 
 ---
 
-## 二、环境与运行线（负责人：2411204-孙唯源）
+## 二、环境搭建与练习二调试（负责人：2411204-孙唯源）
 
-### prompt-03 修复 `make qemu` 无法进入内核（QEMU/OpenSBI 版本差异）
+> 本条与 AI 的完整对话记录见 `report/images/ai_sun_dialogue.jpg`（对话中附件为《组员甲任务指引》）。
 
-- **用途**：让 `make qemu` 在本机 QEMU 7.0 + OpenSBI 1.0 上正常运行并进入内核
-- **工具/模型**：DeepSeek Harness / deepseek-v4-flash
-- **现象**：`make qemu` 停在 OpenSBI 横幅，没有内核输出；横幅中显示
-  `Domain0 Next Address : 0x0000000000000000`
-- **正文**：
-  ```text
-  make qemu 停在 OpenSBI 横幅、没有内核输出，横幅里 Domain0 Next Address 是 0x0，为什么？
-  ```
-- **AI 诊断**：Makefile 的 `qemu` 目标用 `-device loader,file=ucore.img,addr=0x80200000`，它只把内核**放入内存**，并不会让 OpenSBI 跳过去；新版 OpenSBI 的 next address 是 `0x0`（老版本默认 `0x80200000`，所以指导书里能跑），因此内核从未被执行。
-- **修复**：把 `-device loader,...` 改为 `-kernel`：
-  ```bash
-  sed -i 's|-device loader,file=$(UCOREIMG),addr=0x80200000|-kernel $(UCOREIMG)|g' Makefile
-  ```
-- **结果**：成功。OpenSBI 横幅中 `Domain0 Next Address : 0x0000000080200000`，并打印 `(THU.CST) os is loading ...`（见 `report/images/qemu_success.png`）。
-- **迭代**：第 1 次用 `-device loader` 失败 → 定位为 QEMU/OpenSBI 版本行为差异 → 第 2 次改用 `-kernel` 成功。
+### prompt-03 让 AI 给出本任务（环境搭建 + 构建运行 + 练习2 GDB）的完整步骤
 
----
-
-## 三、练习二：GDB 调试启动流程（负责人：2411204-孙唯源）
-
-> 本条与 AI 的完整对话记录见 `report/images/ai_sun_dialogue.jpg`。
-
-### prompt-04 指导 GDB 调试步骤与命令
-
-- **用途**：指导使用 `make debug` / `make gdb` 以及 `info registers`、`x/20i $pc`、`b *0x80200000`、`c`、`si`、`x/10x $sp` 等命令跟踪启动流程
+- **用途**：一次性拿到"环境搭建 → `make qemu` → 练习2 GDB 调试"的完整操作方案
 - **工具/模型**：DeepSeek Harness / deepseek-v4-flash
 - **正文**：
   ```text
-  <见 images/ai_sun_dialogue.jpg 中的对话正文>
+  （附上《组员甲任务指引：环境搭建 + 构建运行 + 练习2 GDB 调试》文件）
+  这个实验怎么做
   ```
-- **结果**：成功，得到从 `0x1000` 复位点到 `0x80200000` 内核入口的完整观察（详见报告"练习二"）。
+- **结果**：成功。AI 按顺序给出完整方案，共 8 节：
+  1. 启动 WSL（`wsl -d Ubuntu-22.04`）
+  2. 安装 QEMU（`apt install qemu-system-misc`，版本 ≥ 4.1）
+  3. 安装 RISC-V 工具链（SiFive 预编译链解压到 `/opt/riscv` + 配 PATH；验证 `gcc -v`）
+  4. 放代码并运行（拷到 WSL 家目录 → `make` → `make qemu`，成功标志 `(THU.CST) os is loading ...`）
+  5. 练习2：GDB 追踪启动流程（`make debug` + `make gdb`；`info registers`、`x/20i $pc`、`b *0x80200000`、`c`、`si`、`x/10x $sp`）
+  6. 练习2 问题怎么答（地址 `0x1000`，固件做初始化、读 hartid、备参后跳 OpenSBI，再到 `0x80200000`）
+  7. 截图和交付物（`report/images/` 固定命名 + 练习2 文字记录 + `prompt_甲.md`）
+  8. 常见坑（PATH 未配、`make qemu` 卡住属正常、GDB 停在 `0x1000` 属正常等）
+- **迭代**：一次提问即得到完整步骤清单，未再迭代。
 
 ---
 
-## 四、报告撰写（负责人：2410621-辛梓晗）
+## 三、检验复现与统筹（负责人：2410621-辛梓晗）
 
-### prompt-05 报告结构、术语与表述
+### prompt-04 复现并核验练习二 GDB 调试
 
-- **用途**：整理报告结构、术语与表述，整合练习一/练习二结果
+- **用途**：复现并核验练习二（GDB 从 `0x1000` 到 `0x80200000` 的启动流程追踪），确认输出
 - **工具/模型**：OpenCode / deepseek-v4.1-flash
 - **正文**：
   ```text
-  <按实际使用补；核心是"把练习一、练习二的观察结果整理成实验报告，术语准确、以文本说明为主">
+  根据指引指导我复现 GDB 从 0x1000 到 0x80200000 的调试，确认输出
   ```
-- **结果**：形成本报告终稿。
+- **结果**：成功。在 WSL 中按 `make debug` + `make gdb` 复现，确认 GDB 停在复位点 `0x1000`、断点命中 `0x80200000`，得到复位指令、内核入口反汇编与寄存器输出（见 `report/images/gdb_at_1000.png`、`gdb_at_80200000.png`、`gdb_registers.png`）。
+- **迭代**：初次为手动逐条执行 GDB 命令；之后**添加合适的自动化复现脚本**——`code/gdb_trace.gdb`（批处理采集复位点/入口的反汇编与寄存器）+ `code/run_gdb.sh`（一键编排：起暂停的 QEMU → 跑批处理 GDB → 收集输出 → 清理），使整段调试可重复复现。
