@@ -35,7 +35,9 @@
 | 2412243-曹珂瑜 | VS Code 插件 | DeepSeek-V4-flash | |
 | 2411204-孙唯源 | <!-- 待填 --> | <!-- 待填 --> | |
 
-运行环境（实测）：WSL Ubuntu 22.04.5 LTS、QEMU 7.0.0、riscv64-unknown-elf 工具链（gcc 15.1.0，`rv64gc`/`lp64d`，编译选项 `-mcmodel=medany`）、GDB 16.3.90。
+运行环境（实测）：WSL Ubuntu 22.04.5 LTS、QEMU 7.0.0、riscv64-unknown-elf 工具链（gcc 15.1.0，`rv64gc`/`lp64d`，编译选项 `-mcmodel=medany`）、GDB 16.3.90。版本截图如下：
+
+![实验环境版本](./images/env_versions.png)
 
 ---
 
@@ -176,6 +178,10 @@ pc  0x80200000  <kern_entry>
 3. GDB 命中内核入口 `0x80200000`（练习二）：
 
    ![GDB @ 0x80200000](./images/gdb_at_80200000.png)
+
+4. GDB 复位点的寄存器状态（练习二，PC=`0x1000`，各寄存器初值均为 0）：
+
+   ![GDB registers](./images/gdb_registers.png)
 
 > 说明 1：本实验代码包缺少 `tools/grade.sh`，`make grade` 无法运行，故测试证据以 `make qemu` 输出 + GDB 调试记录为准。
 >
