@@ -1,0 +1,5 @@
+# 统一使用 LF，避免 shell 脚本在克隆后变成 CRLF 而无法执行
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.drawio binary
