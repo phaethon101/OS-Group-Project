@@ -6,7 +6,7 @@
     csrw sscratch, sp
 
     addi sp, sp, -36 * REGBYTES
-    # save gprs
+    # 保存通用寄存器
     STORE  x1,1*REGBYTES(sp)
     STORE  x3,3*REGBYTES(sp)
     STORE  x4,4*REGBYTES(sp)
@@ -38,7 +38,7 @@
     STORE  x30,30*REGBYTES(sp)
     STORE  x31,31*REGBYTES(sp)
 
-    # get sr, epc, badvaddr, cause
+    # 取出 sstatus / sepc / sbadaddr / scause
     csrr s0, sscratch
     csrr s1, sstatus
     csrr s2, sepc
@@ -53,22 +53,22 @@
     .endm
 
     .macro RESTORE_ALL
-    #lab3:填写你在lab3中实现的代码
+    #lab3 function1 2410621
 
-    # restore sstatus (slot 32) with SSTATUS_SIE cleared, so that
-    # interrupts stay disabled until sret re-enables them via SSTATUS_SPIE
+    # 恢复 sstatus（第 32 槽），并清掉 SSTATUS_SIE：
+    # 这样在 sret 之前中断一直是关的，由 sret 依据 SPIE 重新打开
     LOAD s1, 32*REGBYTES(sp)
     li   s2, SSTATUS_SIE
     not  s2, s2
     and  s1, s1, s2
     csrw sstatus, s1
 
-    # restore sepc (slot 33) before sp is restored; sepc may have been
-    # modified by trap() and is the only place where sepc is written back
+    # 在恢复 sp 之前先恢复 sepc（第 33 槽）：trap() 可能改过它，
+    # 这里也是整个内核唯一回写 sepc 的地方
     LOAD s2, 33*REGBYTES(sp)
     csrw sepc, s2
 
-    # restore x registers, x0 is hard-wired and needs no restore
+    # 恢复通用寄存器；x0 恒为 0，不需要恢复
     LOAD x1, 1*REGBYTES(sp)
     LOAD x3, 3*REGBYTES(sp)
     LOAD x4, 4*REGBYTES(sp)
@@ -100,8 +100,8 @@
     LOAD x30, 30*REGBYTES(sp)
     LOAD x31, 31*REGBYTES(sp)
 
-    # restore sp last: slot 2 holds the sp from before SAVE_ALL allocated
-    # the trapframe, so it must be consumed after all trapframe accesses
+    # sp 最后恢复：第 2 槽存的是 SAVE_ALL 分配 trapframe 之前的 sp，
+    # 必须等所有要访问 trapframe 的动作都做完才能用它
     LOAD x2, 2*REGBYTES(sp)
 
     .endm
@@ -110,22 +110,22 @@
 __alltraps:
     SAVE_ALL
 
-    #lab3:填写你在lab3中实现的代码
-    # sp should be the same as before "jal trap"
-    # pass the current trapframe pointer in a0 (arg0, RISC-V calling convention)
+    #lab3 function1 2410621
+    # 执行完这里，sp 应恢复到 "jal trap" 之前的样子
+    # 按 RISC-V 调用约定，把当前 trapframe 指针经 a0 传进去
     mv a0, sp
-    # jal sets ra to the instruction after it, i.e. the fall-through into
-    # __trapret, so trap() returns exactly at __trapret
+    # jal 会把 ra 设为下一条指令（正好落在 __trapret），
+    # 所以 trap() 返回时就落在 __trapret
     jal trap
 
     .globl __trapret
 __trapret:
     RESTORE_ALL
-    # go back from supervisor call
+    # 从 S 态的陷入返回
     sret
  
     .globl forkrets
 forkrets:
-    # set stack to this new process's trapframe
+    # 把 sp 指向新进程的 trapframe
     move sp, a0
     j __trapret

@@ -6,8 +6,8 @@
     .align 2
     .globl switch_to
 switch_to:
-    # save the context of the current thread into *from (a0), one REGBYTES
-    # per field, in the exact order of struct context
+    # 把当前线程的现场存进 *from（a0 指向它）：每个字段一个 REGBYTES，
+    # 顺序严格等于 struct context 的字段序
     STORE ra,  0*REGBYTES(a0)
     STORE sp,  1*REGBYTES(a0)
     STORE s0,  2*REGBYTES(a0)
@@ -23,8 +23,8 @@ switch_to:
     STORE s10, 12*REGBYTES(a0)
     STORE s11, 13*REGBYTES(a0)
 
-    # restore the context of the next thread from *to (a1); restoring sp is
-    # safe here because no save above needed it any more
+    # 从 *to（a1 指向它）恢复下一个线程的现场；上面的保存已经全部做完，
+    # 此时再恢复 sp 是安全的
     LOAD ra,  0*REGBYTES(a1)
     LOAD sp,  1*REGBYTES(a1)
     LOAD s0,  2*REGBYTES(a1)
@@ -40,5 +40,5 @@ switch_to:
     LOAD s10, 12*REGBYTES(a1)
     LOAD s11, 13*REGBYTES(a1)
 
-    # return to the address saved in the restored ra
+    # 返回到刚恢复的 ra，也就是目标线程上次切出时的下一条指令
     ret

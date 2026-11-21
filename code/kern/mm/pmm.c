@@ -13,28 +13,28 @@
 #include <riscv.h>
 #include <dtb.h>
 
-// virtual address of physical page array
+// 物理页描述符数组的虚拟地址
 struct Page *pages;
-// amount of physical memory (in pages)
+// 物理内存总量（以页为单位）
 size_t npage = 0;
-// The kernel image is mapped at VA=KERNBASE and PA=info.base
+// 内核镜像按 VA=KERNBASE、PA=info.base 建立映射
 uint_t va_pa_offset;
-// memory starts at 0x80000000 in RISC-V
+// RISC-V 上物理内存从 0x80000000 开始
 const size_t nbase = DRAM_BASE / PGSIZE;
 
-// virtual address of boot-time page directory
+// 启动期页目录的虚拟地址
 pde_t *boot_pgdir_va = NULL;
-// physical address of boot-time page directory
+// 启动期页目录的物理地址
 uintptr_t boot_pgdir_pa;
 
-// physical memory management
+// 物理内存管理器
 const struct pmm_manager *pmm_manager;
 
 static void check_alloc_page(void);
 static void check_pgdir(void);
 static void check_boot_pgdir(void);
 
-// init_pmm_manager - initialize a pmm_manager instance
+// init_pmm_manager - 初始化一个 pmm_manager 实例
 static void init_pmm_manager(void)
 {
     pmm_manager = &default_pmm_manager;
@@ -42,14 +42,13 @@ static void init_pmm_manager(void)
     pmm_manager->init();
 }
 
-// init_memmap - call pmm->init_memmap to build Page struct for free memory
+// init_memmap - 调 pmm->init_memmap，把空闲页建成 Page 结构
 static void init_memmap(struct Page *base, size_t n)
 {
     pmm_manager->init_memmap(base, n);
 }
 
-// alloc_pages - call pmm->alloc_pages to allocate a continuous n*PAGESIZE
-// memory
+// alloc_pages - 调 pmm->alloc_pages，分配连续 n 个页（n*PAGESIZE 字节）
 struct Page *alloc_pages(size_t n)
 {
     struct Page *page = NULL;
@@ -62,7 +61,7 @@ struct Page *alloc_pages(size_t n)
     return page;
 }
 
-// free_pages - call pmm->free_pages to free a continuous n*PAGESIZE memory
+// free_pages - 调 pmm->free_pages，释放连续 n 个页
 void free_pages(struct Page *base, size_t n)
 {
     bool intr_flag;
@@ -73,8 +72,7 @@ void free_pages(struct Page *base, size_t n)
     local_intr_restore(intr_flag);
 }
 
-// nr_free_pages - call pmm->nr_free_pages to get the size (nr*PAGESIZE)
-// of current free memory
+// nr_free_pages - 调 pmm->nr_free_pages，返回当前空闲页数
 size_t nr_free_pages(void)
 {
     size_t ret;
@@ -163,12 +161,12 @@ static void enable_paging(void)
     write_csr(satp, 0x8000000000000000 | (boot_pgdir_pa >> RISCV_PGSHIFT));
 }
 
-// boot_map_segment - setup&enable the paging mechanism
-// parameters
-//  la:   linear address of this memory need to map (after x86 segment map)
-//  size: memory size
-//  pa:   physical address of this memory
-//  perm: permission of this memory
+// boot_map_segment - 建立并启用分页机制
+// 参数
+//  la:   需要映射的线性地址（x86 上还要经过段映射，RISC-V 上就是虚拟地址）
+//  size: 映射长度
+//  pa:   这段内存的物理地址
+//  perm: 权限位
 static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
                              uintptr_t pa, uint32_t perm)
 {
@@ -184,10 +182,9 @@ static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size,
     }
 }
 
-// boot_alloc_page - allocate one page using pmm->alloc_pages(1)
-// return value: the kernel virtual address of this allocated page
-// note: this function is used to get the memory for PDT(Page Directory
-// Table)&PT(Page Table)
+// boot_alloc_page - 用 pmm->alloc_pages(1) 分配一页
+// 返回值：这一页的内核虚拟地址
+// 说明：该函数用于为 PDT（页目录表）和 PT（页表）取内存
 static void *boot_alloc_page(void)
 {
     struct Page *p = alloc_page();
@@ -198,29 +195,23 @@ static void *boot_alloc_page(void)
     return page2kva(p);
 }
 
-// pmm_init - setup a pmm to manage physical memory, build PDT&PT to setup
-// paging mechanism
-//         - check the correctness of pmm & paging mechanism, print PDT&PT
+// pmm_init - 建立物理内存管理器，构建 PDT/PT 以启用分页
+//           - 并检查 pmm 与分页机制的正确性
 void pmm_init(void)
 {
-    // We need to alloc/free the physical memory (granularity is 4KB or other
-    // size).
-    // So a framework of physical memory manager (struct pmm_manager)is defined
-    // in pmm.h
-    // First we should init a physical memory manager(pmm) based on the
-    // framework.
-    // Then pmm can alloc/free the physical memory.
-    // Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
+    // 内核需要按 4KB（或更大）的粒度分配、释放物理内存，
+    // 所以 pmm.h 里定义了一套物理内存管理器的框架（struct pmm_manager）。
+    // 先按这套框架初始化一个内存管理器，它才能分配/释放物理内存；
+    // 目前可选的有 first_fit / best_fit / worst_fit / buddy_system。
     init_pmm_manager();
 
-    // detect physical memory space, reserve already used memory,
-    // then use pmm->init_memmap to create free page list
+    // 探测物理内存范围、保留已被占用的部分，
+    // 再用 pmm->init_memmap 建立空闲页链表
     page_init();
 
-    // use pmm->check to verify the correctness of the alloc/free function in a
-    // pmm
+    // 用 pmm->check 检查内存管理器的分配/释放是否正确
     check_alloc_page();
-    // create boot_pgdir, an initial page directory(Page Directory Table, PDT)
+    // 建立 boot_pgdir：启动期的页目录表（PDT）
     extern char boot_page_table_sv39[];
     boot_pgdir_va = (pte_t *)boot_page_table_sv39;
     boot_pgdir_pa = PADDR(boot_pgdir_va);
@@ -229,20 +220,20 @@ void pmm_init(void)
 
     static_assert(KERNBASE % PTSIZE == 0 && KERNTOP % PTSIZE == 0);
 
-    // now the basic virtual memory map(see memalyout.h) is established.
-    // check the correctness of the basic virtual memory map.
+    // 此时基本的虚拟内存映射（见 memlayout.h）已经建立，
+    // 检查这套基本映射是否正确
     check_boot_pgdir();
 
     kmalloc_init();
 }
 
-// get_pte - get pte and return the kernel virtual address of this pte for la
-//        - if the PT contians this pte didn't exist, alloc a page for PT
-// parameter:
-//  pgdir:  the kernel virtual base address of PDT
-//  la:     the linear address need to map
-//  create: a logical value to decide if alloc a page for PT
-// return vaule: the kernel virtual address of this pte
+// get_pte - 找到线性地址 la 对应的页表项，返回它的内核虚拟地址
+//         - 若该页表项所在的页表页不存在，可按需为它分配一页
+// 参数：
+//  pgdir:  PDT 的内核虚拟基地址
+//  la:     需要映射的线性地址
+//  create: 布尔值，决定页表页不存在时是否分配
+// 返回值：该页表项的内核虚拟地址
 pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 {
     pde_t *pdep1 = &pgdir[PDX1(la)];
@@ -274,7 +265,7 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
     return &((pte_t *)KADDR(PDE_ADDR(*pdep0)))[PTX(la)];
 }
 
-// get_page - get related Page struct for linear address la using PDT pgdir
+// get_page - 按 PDT 与线性地址 la 找出对应的 Page 结构
 struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 {
     pte_t *ptep = get_pte(pgdir, la, 0);
@@ -372,12 +363,12 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     return 0;
 }
 
-// invalidate a TLB entry, but only if the page tables being
-// edited are the ones currently in use by the processor.
+// 使 TLB 中某一条翻译失效；只有被修改的页表正是当前
+// CPU 正在使用的那一份时才有必要。
 void tlb_invalidate(pde_t *pgdir, uintptr_t la)
 {
     // flush_tlb();
-    // The flush_tlb flush the entire TLB, is there any better way?
+    // flush_tlb 会刷新整个 TLB，有没有更好的办法？
     asm volatile("sfence.vma %0" : : "r"(la));
 }
 
@@ -390,8 +381,7 @@ static void check_alloc_page(void)
 static void check_pgdir(void)
 {
     // assert(npage <= KMEMSIZE / PGSIZE);
-    // The memory starts at 2GB in RISC-V
-    // so npage is always larger than KMEMSIZE / PGSIZE
+    // RISC-V 上内存从 2GB 起，所以 npage 总是大于 KMEMSIZE / PGSIZE
     size_t nr_free_store;
 
     nr_free_store = nr_free_pages();
@@ -491,7 +481,7 @@ static void check_boot_pgdir(void)
     cprintf("check_boot_pgdir() succeeded!\n");
 }
 
-// perm2str - use string 'u,r,w,-' to present the permission
+// perm2str - 用 'u,r,w,-' 这样的字符串表示权限位
 static const char *perm2str(int perm)
 {
     static char str[4];
@@ -502,19 +492,17 @@ static const char *perm2str(int perm)
     return str;
 }
 
-// get_pgtable_items - In [left, right] range of PDT or PT, find a continuous
-// linear addr space
-//                  - (left_store*X_SIZE~right_store*X_SIZE) for PDT or PT
-//                  - X_SIZE=PTSIZE=4M, if PDT; X_SIZE=PGSIZE=4K, if PT
-// paramemters:
-//  left:        no use ???
-//  right:       the high side of table's range
-//  start:       the low side of table's range
-//  table:       the beginning addr of table
-//  left_store:  the pointer of the high side of table's next range
-//  right_store: the pointer of the low side of table's next range
-//  return value: 0 - not a invalid item range, perm - a valid item range with
-//  perm permission
+// get_pgtable_items - 在 PDT 或 PT 的 [left, right) 范围内找一段连续的线性地址空间
+//                  - 对应 (left_store*X_SIZE ~ right_store*X_SIZE) 这段区间
+//                  - PDT 时 X_SIZE = PTSIZE = 4M；PT 时 X_SIZE = PGSIZE = 4K
+// 参数：
+//  left:        未使用
+//  right:       表格范围的右边界
+//  start:       表格范围的左边界
+//  table:       表格起始地址
+//  left_store:  下一段范围右边界的存放位置
+//  right_store: 下一段范围左边界的存放位置
+// 返回值：0 表示没有有效的表项区间；否则返回该区间的权限位
 static int get_pgtable_items(size_t left, size_t right, size_t start,
                              uintptr_t *table, size_t *left_store,
                              size_t *right_store)

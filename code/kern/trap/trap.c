@@ -21,17 +21,16 @@ static void print_ticks()
 #endif
 }
 
-/* idt_init - initialize IDT to each of the entry points in kern/trap/vectors.S
+/* idt_init - 把中断向量表指向 kern/trap/trapentry.S 里的入口
  */
 void idt_init(void)
 {
     extern void __alltraps(void);
-    /* Set sscratch register to 0, indicating to exception vector that we are
-     * presently executing in the kernel */
+    /* 把 sscratch 置 0：告诉异常向量表，当前已经在内核里执行 */
     write_csr(sscratch, 0);
-    /* Set the exception vector address */
+    /* 设置异常向量入口地址 */
     write_csr(stvec, &__alltraps);
-    /* Allow kernel to access user memory */
+    /* 允许内核访问用户内存（SUM 位） */
     set_csr(sstatus, SSTATUS_SUM);
 }
 
@@ -83,7 +82,7 @@ void print_regs(struct pushregs *gpr)
 
 extern struct mm_struct *check_mm_struct;
 
-//lab3 请补充你在lab3中的代码
+//lab3 function2 2410621
 
 /* *
  * trap_cause_code - 取出 scause 里的原因编码
@@ -165,22 +164,21 @@ void exception_handler(struct trapframe *tf) {
 
 
 /* *
- * trap - handles or dispatches an exception/interrupt. if and when trap()
- * returns,
- * the code in kern/trap/trapentry.S restores the old CPU state saved in the
- * trapframe and then uses the iret instruction to return from the exception.
+ * trap - 异常/中断的总处理入口。trap() 返回后，
+ * kern/trap/trapentry.S 里的代码会从 trapframe 中恢复被保存的 CPU 现场，
+ * 再用 sret 从中断/异常中返回。
  * */
 void trap(struct trapframe *tf)
 {
-    // dispatch based on what type of trap occurred
+    // 按 trap 的类型分派：scause 最高位为 1 是中断，否则是异常
     if ((intptr_t)tf->cause < 0)
     {
-        // interrupts
+        // 中断
         interrupt_handler(tf);
     }
     else
     {
-        // exceptions
+        // 异常
         exception_handler(tf);
     }
 }

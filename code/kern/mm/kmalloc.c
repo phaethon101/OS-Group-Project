@@ -166,7 +166,7 @@ static void slob_free(void *block, int size)
 	if (size)
 		b->units = SLOB_UNITS(size);
 
-	/* Find reinsertion point */
+	/* 找到重新插入的位置 */
 	spin_lock_irqsave(&slob_lock, flags);
 	for (cur = slobfree; !(b > cur && b < cur->next); cur = cur->next)
 		if (cur >= cur->next && (b > cur || b < cur->next))
@@ -273,7 +273,7 @@ void kfree(void *block)
 
 	if (!((unsigned long)block & (PAGE_SIZE - 1)))
 	{
-		/* might be on the big block list */
+		/* 可能在大块链表里 */
 		spin_lock_irqsave(&block_lock, flags);
 		for (bb = bigblocks; bb; last = &bb->next, bb = bb->next)
 		{

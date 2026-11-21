@@ -146,7 +146,7 @@ best_nr_free_pages(void) {
     return nr_free;
 }
 
-// Framework tests: students must not modify basic_check or best_fit_check.
+// 框架自带的测试：不得修改 basic_check 与 best_fit_check。
 static void
 basic_check(void) {
     struct Page *p0, *p1, *p2;

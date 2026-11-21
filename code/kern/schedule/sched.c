@@ -12,13 +12,12 @@ wakeup_proc(struct proc_struct *proc) {
 
 //LAB4 function3 2410621
 
-// schedule - pick the next runnable thread in FIFO round-robin order
-//   rule 1: start from the node after current, or from the list head when
-//           current is the idle thread;
-//   rule 2: walk the whole proc_list ring and take the first PROC_RUNNABLE
-//           thread; if none is found, fall back to idleproc;
-//   rule 3: clear current->need_resched first, count the run in next->runs,
-//           and switch only when next is not current.
+// schedule - 按 FIFO 轮转挑出下一个可运行的线程
+//   规则一：从 current 的下一个节点开始找；current 是 idleproc 时从表头开始；
+//   规则二：绕 proc_list 走一圈，取第一个 PROC_RUNNABLE 的线程；
+//           一个都找不到就回退到 idleproc；
+//   规则三：先把 current->need_resched 清零，把这次运行记到 next->runs 上，
+//           只有 next 不是 current 时才真正切换。
 void
 schedule(void) {
     bool intr_flag;
